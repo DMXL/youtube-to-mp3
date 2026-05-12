@@ -1,0 +1,7 @@
+node_modules/
+downloads/
+output/
+bin/
+.DS_Store
+*.log
+.env
