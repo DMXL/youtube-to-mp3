@@ -20,8 +20,7 @@ const OUTPUT_DIR = join(ROOT, 'output');
 const argv = process.argv.slice(2);
 const verbose = argv.some((a) => a === '--verbose' || a === '-v');
 if (verbose) process.env.YT2MP3_DEBUG = '1';
-const keepVideoFlag = argv.some((a) => a === '--keep-video' || a === '-k');
-const FLAG_TOKENS = new Set(['--verbose', '-v', '--keep-video', '-k']);
+const FLAG_TOKENS = new Set(['--verbose', '-v']);
 const positional = argv.filter((a) => !FLAG_TOKENS.has(a) && !a.startsWith('-'));
 const cliUrl = positional[0];
 
@@ -76,9 +75,7 @@ async function main() {
   });
   const { bitrate } = QUALITY_TIERS[quality];
 
-  const keepVideo = keepVideoFlag
-    ? true
-    : await confirm({ message: 'Save downloaded video files?', default: false });
+  const keepVideo = await confirm({ message: 'Save downloaded video files?', default: false });
 
   const collectionName = safeName(target.title, target.kind === 'playlist' ? 'playlist' : 'video');
   const outDir = join(OUTPUT_DIR, collectionName);
