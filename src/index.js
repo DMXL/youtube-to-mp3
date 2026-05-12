@@ -16,6 +16,16 @@ const ROOT = process.cwd();
 const DOWNLOADS_DIR = join(ROOT, 'downloads');
 const OUTPUT_DIR = join(ROOT, 'output');
 
+// Parse out `--verbose` / `-v` from argv. Anything left is treated as the URL.
+const argv = process.argv.slice(2);
+const verbose = argv.some((a) => a === '--verbose' || a === '-v');
+if (verbose) process.env.YT2MP3_DEBUG = '1';
+const positional = argv.filter((a) => a !== '--verbose' && a !== '-v' && !a.startsWith('-'));
+const cliUrl = positional[0];
+
+// Warn the user if a download stalls for too long.
+const STALL_MS = 45_000;
+
 async function main() {
   console.log(chalk.bold.cyan('\n🎵 YouTube → MP3\n'));
 
@@ -30,7 +40,7 @@ async function main() {
   }
 
   const url =
-    process.argv[2] ??
+    cliUrl ??
     (await input({
       message: 'Paste a YouTube video or playlist URL:',
       validate: (v) => (v.trim().length > 0 ? true : 'URL is required'),
@@ -49,6 +59,13 @@ async function main() {
       ? `Playlist: ${chalk.bold(target.title)} (${target.items.length} videos)`
       : `Video: ${chalk.bold(target.title)}`,
   );
+  if (target.unavailableCount > 0) {
+    console.log(
+      chalk.gray(
+        `  ↳ ${target.unavailableCount} unavailable video(s) in this playlist will be skipped (deleted / private / region-locked)`,
+      ),
+    );
+  }
 
   const quality = await select({
     message: 'Choose MP3 quality:',
@@ -97,8 +114,20 @@ async function main() {
 
     let videoPath;
     const dlSpinner = ora('  Downloading video…').start();
+    let lastProgressAt = Date.now();
+    let stallWarned = false;
+    const stallTimer = setInterval(() => {
+      if (!stallWarned && Date.now() - lastProgressAt > STALL_MS) {
+        stallWarned = true;
+        dlSpinner.text += chalk.yellow(
+          `  (no progress in ${Math.round(STALL_MS / 1000)}s — see ${join(dlDir, `${baseName}.yt-dlp.log`)})`,
+        );
+      }
+    }, 5000);
     try {
       videoPath = await downloadVideo(item.url, dlDir, baseName, (p) => {
+        lastProgressAt = Date.now();
+        stallWarned = false;
         const pct = Number.isFinite(p.percent) ? `${p.percent.toFixed(1)}%` : '';
         const size = p.totalSize ? ` of ${p.totalSize}` : '';
         const speed = p.currentSpeed ? ` @ ${p.currentSpeed}` : '';
@@ -109,6 +138,8 @@ async function main() {
       dlSpinner.fail(`  Download failed: ${err.message}`);
       failures.push({ item, stage: 'download', error: err });
       continue;
+    } finally {
+      clearInterval(stallTimer);
     }
 
     const cvSpinner = ora(`  Converting to MP3 @ ${bitrate} kbps…`).start();

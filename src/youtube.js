@@ -21,17 +21,21 @@ export async function resolveTarget(input) {
   }
 
   if (json._type === 'playlist') {
+    const rawEntries = (json.entries ?? []).filter((e) => e && e.id);
+    const items = rawEntries
+      .filter((e) => !isUnavailableEntry(e))
+      .map((e) => ({
+        id: e.id,
+        url: e.url ?? `https://www.youtube.com/watch?v=${e.id}`,
+        title: e.title ?? e.id,
+        durationSec: Number(e.duration) || 0,
+      }));
+    const unavailableCount = rawEntries.length - items.length;
     return {
       kind: 'playlist',
       title: json.title ?? 'playlist',
-      items: (json.entries ?? [])
-        .filter((e) => e && e.id)
-        .map((e) => ({
-          id: e.id,
-          url: e.url ?? `https://www.youtube.com/watch?v=${e.id}`,
-          title: e.title ?? e.id,
-          durationSec: Number(e.duration) || 0,
-        })),
+      items,
+      unavailableCount,
     };
   }
 
@@ -46,5 +50,18 @@ export async function resolveTarget(input) {
         durationSec: Number(json.duration) || 0,
       },
     ],
+    unavailableCount: 0,
   };
+}
+
+// Detects deleted/private/region-locked entries that yt-dlp includes as placeholders
+// in flat-playlist output. Their titles are sentinels and their duration is null.
+function isUnavailableEntry(entry) {
+  const t = (entry.title ?? '').trim();
+  if (t === '[Deleted video]' || t === '[Private video]' || t === '[Unavailable video]') {
+    return true;
+  }
+  // Some unavailable entries come through with no title and no duration.
+  if (!t && entry.duration == null) return true;
+  return false;
 }

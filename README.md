@@ -33,6 +33,17 @@ npm start -- "https://www.youtube.com/watch?v=AOnXQ3STB1A"
 npm start -- "https://www.youtube.com/watch?v=exMohdiKsk0&list=PLED18C68935FF110B"
 ```
 
+Pass `--verbose` (or `-v`) to also stream the raw yt-dlp output to stderr while
+downloading:
+
+```bash
+npm start -- --verbose "https://www.youtube.com/watch?v=AOnXQ3STB1A"
+```
+
+Regardless of verbose mode, every download writes a full yt-dlp log next to the
+intermediate video file at `downloads/<collection>/<title>.yt-dlp.log`. If a
+download stalls for more than 45 s, the spinner points you at that log.
+
 ## Output layout
 
 ```
