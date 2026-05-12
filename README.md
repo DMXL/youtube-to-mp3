@@ -40,6 +40,15 @@ downloading:
 npm start -- --verbose "https://www.youtube.com/watch?v=AOnXQ3STB1A"
 ```
 
+Pass `--keep-video` (or `-k`) to retain the intermediate video files in
+`downloads/<collection>/` after conversion (by default they're deleted once
+their MP3 has been written). Without the flag the interactive run will ask
+"Save downloaded video files?" with a default of no.
+
+```bash
+npm start -- --keep-video "https://www.youtube.com/watch?v=AOnXQ3STB1A"
+```
+
 Regardless of verbose mode, every download writes a full yt-dlp log next to the
 intermediate video file at `downloads/<collection>/<title>.yt-dlp.log`. If a
 download stalls for more than 45 s, the spinner points you at that log.

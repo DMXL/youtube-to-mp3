@@ -16,11 +16,13 @@ const ROOT = process.cwd();
 const DOWNLOADS_DIR = join(ROOT, 'downloads');
 const OUTPUT_DIR = join(ROOT, 'output');
 
-// Parse out `--verbose` / `-v` from argv. Anything left is treated as the URL.
+// Parse flags from argv. Anything left is treated as the URL.
 const argv = process.argv.slice(2);
 const verbose = argv.some((a) => a === '--verbose' || a === '-v');
 if (verbose) process.env.YT2MP3_DEBUG = '1';
-const positional = argv.filter((a) => a !== '--verbose' && a !== '-v' && !a.startsWith('-'));
+const keepVideoFlag = argv.some((a) => a === '--keep-video' || a === '-k');
+const FLAG_TOKENS = new Set(['--verbose', '-v', '--keep-video', '-k']);
+const positional = argv.filter((a) => !FLAG_TOKENS.has(a) && !a.startsWith('-'));
 const cliUrl = positional[0];
 
 // Warn the user if a download stalls for too long.
@@ -74,13 +76,20 @@ async function main() {
   });
   const { bitrate } = QUALITY_TIERS[quality];
 
+  const keepVideo = keepVideoFlag
+    ? true
+    : await confirm({ message: 'Save downloaded video files?', default: false });
+
   const collectionName = safeName(target.title, target.kind === 'playlist' ? 'playlist' : 'video');
   const outDir = join(OUTPUT_DIR, collectionName);
   const dlDir = join(DOWNLOADS_DIR, collectionName);
 
   console.log(
     chalk.gray(
-      `\nVideos will download to ${chalk.white(dlDir)}\nMP3s will be written to ${chalk.white(outDir)}\n`,
+      `\nMP3s will be written to ${chalk.white(outDir)}\n` +
+        (keepVideo
+          ? `Video files will be kept at ${chalk.white(dlDir)}\n`
+          : `Video files will be downloaded to ${chalk.white(dlDir)} and removed after conversion\n`),
     ),
   );
 
@@ -149,16 +158,17 @@ async function main() {
       });
       const s = await stat(mp3Path);
       cvSpinner.succeed(`  Saved ${chalk.cyan(mp3Path)} (${formatBytes(s.size)})`);
-      // Tidy up the intermediate video so we don't leave large files lying around.
-      await rm(videoPath, { force: true });
+      if (!keepVideo) await rm(videoPath, { force: true });
     } catch (err) {
       cvSpinner.fail(`  Conversion failed: ${err.message}`);
       failures.push({ item, stage: 'convert', error: err });
     }
   }
 
-  // If we cleaned up every video file, try to remove the (now-empty) downloads subdir.
-  await rm(dlDir, { recursive: true, force: true }).catch(() => {});
+  // If we deleted every video file, try to remove the (now-empty) downloads subdir.
+  if (!keepVideo) {
+    await rm(dlDir, { recursive: true, force: true }).catch(() => {});
+  }
 
   console.log();
   if (failures.length === 0) {
